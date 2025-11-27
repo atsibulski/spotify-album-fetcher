@@ -21,6 +21,7 @@ if (typeof window === 'undefined') {
 
 interface UserShelves {
   userId: string;
+  spotifyId?: string; // Add spotifyId for public access
   shelves: Shelf[];
   updatedAt: number;
 }
@@ -67,12 +68,19 @@ export function getUserShelves(userId: string): Shelf[] {
   return userShelves?.shelves || [];
 }
 
-export function saveUserShelves(userId: string, shelves: Shelf[]): void {
+export function getUserShelvesBySpotifyId(spotifyId: string): Shelf[] {
+  const allShelves = readAllShelves();
+  const userShelves = allShelves.find((us) => us.spotifyId === spotifyId);
+  return userShelves?.shelves || [];
+}
+
+export function saveUserShelves(userId: string, shelves: Shelf[], spotifyId?: string): void {
   const allShelves = readAllShelves();
   const existingIndex = allShelves.findIndex((us) => us.userId === userId);
   
   const userShelves: UserShelves = {
     userId,
+    spotifyId, // Store spotifyId for public access
     shelves,
     updatedAt: Date.now(),
   };

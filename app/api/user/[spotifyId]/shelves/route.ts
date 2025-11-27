@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserBySpotifyId } from '@/lib/db';
-import { getUserShelves } from '@/lib/shelves';
+import { getUserShelves, getUserShelvesBySpotifyId } from '@/lib/shelves';
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +21,7 @@ export async function GET(
     let shelves: any[] = [];
 
     if (user) {
-      // User exists in database, get their shelves
+      // User exists in database, get their shelves by userId
       shelves = getUserShelves(user.id);
       
       return NextResponse.json({
@@ -30,6 +30,22 @@ export async function GET(
           spotifyId: user.spotifyId,
           displayName: user.displayName,
           imageUrl: user.imageUrl,
+        },
+        shelves,
+      });
+    }
+
+    // User not in database, try to get shelves by spotifyId (for public access)
+    shelves = getUserShelvesBySpotifyId(spotifyId);
+    
+    if (shelves.length > 0) {
+      // Found shelves by spotifyId, return public profile
+      return NextResponse.json({
+        user: {
+          id: `spotify_${spotifyId}`,
+          spotifyId: spotifyId,
+          displayName: spotifyId,
+          imageUrl: null,
         },
         shelves,
       });

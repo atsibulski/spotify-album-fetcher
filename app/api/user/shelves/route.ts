@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    saveUserShelves(session.userId, shelves);
+    // Use spotifyId from session for public access (more reliable than DB lookup)
+    const spotifyId = session.spotifyId;
+    saveUserShelves(session.userId, shelves, spotifyId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error saving shelves:', error);
