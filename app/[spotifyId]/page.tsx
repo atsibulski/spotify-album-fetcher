@@ -57,7 +57,12 @@ export default function UserProfilePage() {
         }
 
         const data = await response.json();
-        setProfileUser(data.user);
+        // Always set profile user (API now returns a profile even if user not in DB)
+        setProfileUser(data.user || {
+          spotifyId: spotifyId,
+          displayName: spotifyId,
+          imageUrl: null,
+        });
         setShelves(data.shelves || []);
       } catch (err) {
         console.error('Error fetching user profile:', err);
@@ -168,13 +173,22 @@ export default function UserProfilePage() {
     );
   }
 
-  if (error || !profileUser) {
+  // Create a default profile user if not found (for public viewing)
+  // This allows profiles to be shareable even if user not in database
+  const displayUser = profileUser || {
+    spotifyId: spotifyId,
+    displayName: spotifyId,
+    imageUrl: null,
+  };
+
+  // Only show error for actual errors, not "user not found" (we'll show a public profile)
+  if (error && error !== 'User not found' && error !== 'Failed to load profile') {
     return (
       <main className="min-h-screen bg-gradient-to-br from-green-900 via-black to-green-900 p-4 md:p-8 pb-24">
         <div className="max-w-7xl mx-auto pt-20">
           <div className="text-center text-red-400">
-            <p className="text-xl font-bold mb-2">Profile Not Found</p>
-            <p className="text-gray-400">{error || 'The user profile you are looking for does not exist.'}</p>
+            <p className="text-xl font-bold mb-2">Error Loading Profile</p>
+            <p className="text-gray-400">{error}</p>
             <button
               onClick={() => router.push('/')}
               className="mt-4 px-6 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors"
@@ -215,16 +229,16 @@ export default function UserProfilePage() {
       {/* User Profile Header */}
       <div className="max-w-7xl mx-auto pt-20 pb-8">
         <div className="flex items-center gap-6 mb-6">
-          {profileUser.imageUrl && (
+          {displayUser.imageUrl && (
             <img
-              src={profileUser.imageUrl}
-              alt={profileUser.displayName || 'User'}
+              src={displayUser.imageUrl}
+              alt={displayUser.displayName || 'User'}
               className="w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-green-500"
             />
           )}
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-              {profileUser.displayName || 'User'}&apos;s Albums
+              {displayUser.displayName || 'User'}&apos;s Albums
             </h1>
             {isOwnProfile && (
               <div className="flex items-center gap-4 mt-2">

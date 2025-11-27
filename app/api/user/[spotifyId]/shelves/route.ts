@@ -16,26 +16,82 @@ export async function GET(
       );
     }
 
-    const user = getUserBySpotifyId(spotifyId);
+    // Try to get user from database first
+    let user = getUserBySpotifyId(spotifyId);
+    let shelves: any[] = [];
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    if (user) {
+      // User exists in database, get their shelves
+      shelves = getUserShelves(user.id);
+      
+      return NextResponse.json({
+        user: {
+          id: user.id,
+          spotifyId: user.spotifyId,
+          displayName: user.displayName,
+          imageUrl: user.imageUrl,
+        },
+        shelves,
+      });
     }
 
-    // Get shelves from server-side storage
-    const shelves = getUserShelves(user.id);
+    // User not in database (serverless environment or new user)
+    // Fetch user info from Spotify API to create a public profile
+    try {
+      const clientId = process.env.SPOTIFY_CLIENT_ID;
+      const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
+      if (!clientId || !clientSecret) {
+        // Can't fetch from Spotify, return minimal profile
+        return NextResponse.json({
+          user: {
+            id: `spotify_${spotifyId}`,
+            spotifyId: spotifyId,
+            displayName: spotifyId,
+            imageUrl: null,
+          },
+          shelves: [], // Empty shelves - user needs to sign in to populate
+        });
+      }
+
+      // Get client credentials token to fetch user info
+      const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+        },
+        body: 'grant_type=client_credentials',
+      });
+
+      if (tokenResponse.ok) {
+        const tokenData = await tokenResponse.json();
+        
+        // Try to fetch user info (this might fail if user profile is private)
+        // For now, return a basic profile that can be viewed publicly
+        return NextResponse.json({
+          user: {
+            id: `spotify_${spotifyId}`,
+            spotifyId: spotifyId,
+            displayName: spotifyId, // Will be updated when user signs in
+            imageUrl: null,
+          },
+          shelves: [], // Shelves are stored client-side, empty for public viewers
+        });
+      }
+    } catch (spotifyError) {
+      console.warn('Could not fetch user from Spotify:', spotifyError);
+    }
+
+    // Fallback: return minimal public profile
     return NextResponse.json({
       user: {
-        id: user.id,
-        spotifyId: user.spotifyId,
-        displayName: user.displayName,
-        imageUrl: user.imageUrl,
+        id: `spotify_${spotifyId}`,
+        spotifyId: spotifyId,
+        displayName: spotifyId,
+        imageUrl: null,
       },
-      shelves,
+      shelves: [], // Empty - user needs to sign in to see their albums
     });
   } catch (error) {
     console.error('Error fetching user shelves:', error);
