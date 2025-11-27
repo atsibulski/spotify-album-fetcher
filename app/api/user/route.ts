@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = getUserById(session.userId);
+    const user = await getUserById(session.userId);
     
     if (!user) {
       return NextResponse.json(
@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest) {
     if (displayName !== undefined) updates.displayName = displayName;
     if (preferences !== undefined) updates.preferences = preferences;
 
-    const updatedUser = updateUser(session.userId, updates);
+    const updatedUser = await updateUser(session.userId, updates);
     
     if (!updatedUser) {
       return NextResponse.json(

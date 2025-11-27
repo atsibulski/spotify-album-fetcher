@@ -17,12 +17,12 @@ export async function GET(
     }
 
     // Try to get user from database first
-    let user = getUserBySpotifyId(spotifyId);
+    let user = await getUserBySpotifyId(spotifyId);
     let shelves: any[] = [];
 
     if (user) {
       // User exists in database, get their shelves by userId
-      shelves = getUserShelves(user.id);
+      shelves = await getUserShelves(user.id);
       
       return NextResponse.json({
         user: {
@@ -36,7 +36,7 @@ export async function GET(
     }
 
     // User not in database, try to get shelves by spotifyId (for public access)
-    shelves = getUserShelvesBySpotifyId(spotifyId);
+    shelves = await getUserShelvesBySpotifyId(spotifyId);
     
     if (shelves.length > 0) {
       // Found shelves by spotifyId, return public profile

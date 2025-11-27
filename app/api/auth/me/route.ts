@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Try to get user from database
-    let user = getUserById(session.userId);
+    let user = await getUserById(session.userId);
     
     // If user not found in database (serverless/in-memory reset), use session data
     // This handles the case where file storage doesn't persist on Vercel

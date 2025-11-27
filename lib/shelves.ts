@@ -1,6 +1,7 @@
 import { Shelf } from '@/types/shelf';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 const DB_DIR = join(process.cwd(), 'data');
 const SHELVES_FILE = join(DB_DIR, 'shelves.json');
@@ -62,25 +63,101 @@ function writeAllShelves(allShelves: UserShelves[]): void {
   }
 }
 
-export function getUserShelves(userId: string): Shelf[] {
+export async function getUserShelves(userId: string): Promise<Shelf[]> {
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      // First get user's spotifyId
+      const { data: userData } = await supabase
+        .from('users')
+        .select('spotify_id')
+        .eq('id', userId)
+        .single();
+      
+      if (userData?.spotify_id) {
+        const { data, error } = await supabase
+          .from('user_shelves')
+          .select('shelves')
+          .eq('spotify_id', userData.spotify_id)
+          .single();
+        
+        if (!error && data?.shelves) {
+          return data.shelves as Shelf[];
+        }
+      }
+    } catch (error) {
+      console.warn('Supabase shelves query failed, falling back to file storage:', error);
+    }
+  }
+  
+  // Fallback to file storage
   const allShelves = readAllShelves();
   const userShelves = allShelves.find((us) => us.userId === userId);
   return userShelves?.shelves || [];
 }
 
-export function getUserShelvesBySpotifyId(spotifyId: string): Shelf[] {
+export async function getUserShelvesBySpotifyId(spotifyId: string): Promise<Shelf[]> {
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('user_shelves')
+        .select('shelves')
+        .eq('spotify_id', spotifyId)
+        .single();
+      
+      if (!error && data?.shelves) {
+        return data.shelves as Shelf[];
+      }
+    } catch (error) {
+      console.warn('Supabase shelves query failed, falling back to file storage:', error);
+    }
+  }
+  
+  // Fallback to file storage
   const allShelves = readAllShelves();
   const userShelves = allShelves.find((us) => us.spotifyId === spotifyId);
   return userShelves?.shelves || [];
 }
 
-export function saveUserShelves(userId: string, shelves: Shelf[], spotifyId?: string): void {
+export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyId?: string): Promise<void> {
+  if (!spotifyId) {
+    console.warn('⚠️ Cannot save shelves without spotifyId');
+    return;
+  }
+
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('user_shelves')
+        .upsert({
+          user_id: userId,
+          spotify_id: spotifyId,
+          shelves: shelves,
+          updated_at: Date.now(),
+        }, {
+          onConflict: 'spotify_id',
+        });
+      
+      if (!error) {
+        console.log('✅ Shelves saved to Supabase for:', spotifyId);
+        return;
+      } else {
+        console.warn('Supabase upsert failed, falling back to file storage:', error);
+      }
+    } catch (error) {
+      console.warn('Supabase save error, falling back to file storage:', error);
+    }
+  }
+
+  // Fallback to file storage
   const allShelves = readAllShelves();
   const existingIndex = allShelves.findIndex((us) => us.userId === userId);
   
   const userShelves: UserShelves = {
     userId,
-    spotifyId, // Store spotifyId for public access
+    spotifyId,
     shelves,
     updatedAt: Date.now(),
   };

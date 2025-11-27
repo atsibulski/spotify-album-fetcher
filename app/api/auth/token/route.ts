@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let user = getUserById(session.userId);
+    let user = await getUserById(session.userId);
     
     if (!user) {
       return NextResponse.json(
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         const tokenData = await refreshResponse.json();
         
         // Update user with new tokens
-        user = updateUserTokens(
+        user = await updateUserTokens(
           user.id,
           tokenData.access_token,
           user.spotifyRefreshToken, // Keep the same refresh token unless Spotify provides a new one

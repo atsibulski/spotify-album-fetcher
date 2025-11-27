@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const shelves = getUserShelves(session.userId);
+    const shelves = await getUserShelves(session.userId);
     return NextResponse.json({ shelves });
   } catch (error) {
     console.error('Error fetching shelves:', error);
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Use spotifyId from session for public access (more reliable than DB lookup)
     const spotifyId = session.spotifyId;
-    saveUserShelves(session.userId, shelves, spotifyId);
+    await saveUserShelves(session.userId, shelves, spotifyId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error saving shelves:', error);

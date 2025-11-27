@@ -83,12 +83,12 @@ export async function GET(request: NextRequest) {
     console.log('✅ Got user info from Spotify:', spotifyUser.id);
 
     // Find or create user
-    let user = getUserBySpotifyId(spotifyUser.id);
+    let user = await getUserBySpotifyId(spotifyUser.id);
     const isNewUser = !user;
 
     if (user) {
       // Update existing user's tokens
-      const updatedUser = updateUserTokens(
+      const updatedUser = await updateUserTokens(
         user.id,
         tokenData.access_token,
         tokenData.refresh_token,
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Create new user
-      user = createUser({
+      user = await createUser({
         spotifyId: spotifyUser.id,
         email: spotifyUser.email || null,
         displayName: spotifyUser.display_name || spotifyUser.id,

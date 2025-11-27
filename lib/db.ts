@@ -1,6 +1,7 @@
 import { User } from '@/types/user';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 const DB_DIR = join(process.cwd(), 'data');
 const USERS_FILE = join(DB_DIR, 'users.json');
@@ -55,30 +56,166 @@ function writeUsers(users: User[]): void {
   }
 }
 
-export function getUserBySpotifyId(spotifyId: string): User | null {
+export async function getUserBySpotifyId(spotifyId: string): Promise<User | null> {
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('spotify_id', spotifyId)
+        .single();
+      
+      if (!error && data) {
+        // Convert database format to User format
+        return {
+          id: data.id,
+          spotifyId: data.spotify_id,
+          email: data.email,
+          displayName: data.display_name,
+          imageUrl: data.image_url,
+          spotifyAccessToken: data.spotify_access_token,
+          spotifyRefreshToken: data.spotify_refresh_token,
+          tokenExpiresAt: data.token_expires_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          preferences: data.preferences || { theme: 'dark', defaultView: 'grid', autoPlay: false },
+        };
+      }
+    } catch (error) {
+      console.warn('Supabase query failed, falling back to file storage:', error);
+    }
+  }
+  
+  // Fallback to file storage
   const users = readUsers();
   return users.find((u) => u.spotifyId === spotifyId) || null;
 }
 
-export function getUserById(userId: string): User | null {
+export async function getUserById(userId: string): Promise<User | null> {
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (!error && data) {
+        return {
+          id: data.id,
+          spotifyId: data.spotify_id,
+          email: data.email,
+          displayName: data.display_name,
+          imageUrl: data.image_url,
+          spotifyAccessToken: data.spotify_access_token,
+          spotifyRefreshToken: data.spotify_refresh_token,
+          tokenExpiresAt: data.token_expires_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          preferences: data.preferences || { theme: 'dark', defaultView: 'grid', autoPlay: false },
+        };
+      }
+    } catch (error) {
+      console.warn('Supabase query failed, falling back to file storage:', error);
+    }
+  }
+  
+  // Fallback to file storage
   const users = readUsers();
   return users.find((u) => u.id === userId) || null;
 }
 
-export function createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): User {
-  const users = readUsers();
+export async function createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
   const newUser: User = {
     ...userData,
     id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          id: newUser.id,
+          spotify_id: newUser.spotifyId,
+          email: newUser.email,
+          display_name: newUser.displayName,
+          image_url: newUser.imageUrl,
+          spotify_access_token: newUser.spotifyAccessToken,
+          spotify_refresh_token: newUser.spotifyRefreshToken,
+          token_expires_at: newUser.tokenExpiresAt,
+          preferences: newUser.preferences,
+          created_at: newUser.createdAt,
+          updated_at: newUser.updatedAt,
+        });
+      
+      if (!error) {
+        console.log('✅ User created in Supabase:', newUser.spotifyId);
+        return newUser;
+      } else {
+        console.warn('Supabase insert failed, falling back to file storage:', error);
+      }
+    } catch (error) {
+      console.warn('Supabase insert error, falling back to file storage:', error);
+    }
+  }
+
+  // Fallback to file storage
+  const users = readUsers();
   users.push(newUser);
   writeUsers(users);
   return newUser;
 }
 
-export function updateUser(userId: string, updates: Partial<User>): User | null {
+export async function updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
+  // Try Supabase first if configured
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const updateData: any = {
+        updated_at: Date.now(),
+      };
+      
+      if (updates.email !== undefined) updateData.email = updates.email;
+      if (updates.displayName !== undefined) updateData.display_name = updates.displayName;
+      if (updates.imageUrl !== undefined) updateData.image_url = updates.imageUrl;
+      if (updates.spotifyAccessToken !== undefined) updateData.spotify_access_token = updates.spotifyAccessToken;
+      if (updates.spotifyRefreshToken !== undefined) updateData.spotify_refresh_token = updates.spotifyRefreshToken;
+      if (updates.tokenExpiresAt !== undefined) updateData.token_expires_at = updates.tokenExpiresAt;
+      if (updates.preferences !== undefined) updateData.preferences = updates.preferences;
+
+      const { data, error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', userId)
+        .select()
+        .single();
+      
+      if (!error && data) {
+        return {
+          id: data.id,
+          spotifyId: data.spotify_id,
+          email: data.email,
+          displayName: data.display_name,
+          imageUrl: data.image_url,
+          spotifyAccessToken: data.spotify_access_token,
+          spotifyRefreshToken: data.spotify_refresh_token,
+          tokenExpiresAt: data.token_expires_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          preferences: data.preferences || { theme: 'dark', defaultView: 'grid', autoPlay: false },
+        };
+      }
+    } catch (error) {
+      console.warn('Supabase update failed, falling back to file storage:', error);
+    }
+  }
+
+  // Fallback to file storage
   const users = readUsers();
   const userIndex = users.findIndex((u) => u.id === userId);
   if (userIndex === -1) return null;
@@ -92,12 +229,12 @@ export function updateUser(userId: string, updates: Partial<User>): User | null 
   return users[userIndex];
 }
 
-export function updateUserTokens(
+export async function updateUserTokens(
   userId: string,
   accessToken: string,
   refreshToken: string,
   expiresIn: number
-): User | null {
+): Promise<User | null> {
   return updateUser(userId, {
     spotifyAccessToken: accessToken,
     spotifyRefreshToken: refreshToken,
