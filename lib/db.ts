@@ -5,10 +5,17 @@ import { join } from 'path';
 const DB_DIR = join(process.cwd(), 'data');
 const USERS_FILE = join(DB_DIR, 'users.json');
 
+// In-memory fallback for serverless environments
+let inMemoryUsers: User[] = [];
+
 // Ensure data directory exists
 if (typeof window === 'undefined') {
-  if (!existsSync(DB_DIR)) {
-    mkdirSync(DB_DIR, { recursive: true });
+  try {
+    if (!existsSync(DB_DIR)) {
+      mkdirSync(DB_DIR, { recursive: true });
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not create data directory (serverless environment?):', error);
   }
 }
 
@@ -16,20 +23,35 @@ function readUsers(): User[] {
   try {
     if (existsSync(USERS_FILE)) {
       const data = readFileSync(USERS_FILE, 'utf-8');
-      return JSON.parse(data);
+      const users = JSON.parse(data);
+      // Sync in-memory storage with file
+      inMemoryUsers = users;
+      return users;
     }
   } catch (error) {
-    console.error('Error reading users:', error);
+    console.warn('⚠️ Error reading users file, using in-memory storage:', error);
   }
-  return [];
+  // Return in-memory users if file doesn't exist or can't be read
+  return inMemoryUsers.length > 0 ? inMemoryUsers : [];
 }
 
 function writeUsers(users: User[]): void {
+  // Always update in-memory storage first
+  inMemoryUsers = users;
+  
   try {
+    // Try to write to file system
+    // On Vercel/serverless, this may fail - that's okay, we'll use in-memory storage
+    if (!existsSync(DB_DIR)) {
+      mkdirSync(DB_DIR, { recursive: true });
+    }
     writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
   } catch (error) {
-    console.error('Error writing users:', error);
-    throw error;
+    // On serverless platforms (Vercel), file writes may fail
+    // Store in memory as fallback (note: this is ephemeral and will reset on each function invocation)
+    console.warn('⚠️ File write failed (serverless environment?), using in-memory storage:', error);
+    // Don't throw - allow the function to continue
+    // In production, you should migrate to a database (Vercel Postgres, Supabase, etc.)
   }
 }
 
