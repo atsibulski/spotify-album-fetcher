@@ -112,7 +112,7 @@ export default function AlbumModal({ album, isOpen, onClose, formatDuration }: A
       return;
     }
 
-    if (isUsingSpotifyPlayer) {
+    if (isUsingSpotifyPlayer && album) {
       const trackUri = `spotify:track:${trackId}`;
       const success = await spotifyPlayer.playTrack(trackUri, album.tracks);
       if (success) {

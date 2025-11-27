@@ -224,7 +224,7 @@ export default function UserProfilePage() {
           )}
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-              {profileUser.displayName || 'User'}'s Albums
+              {profileUser.displayName || 'User'}&apos;s Albums
             </h1>
             {isOwnProfile && (
               <div className="flex items-center gap-4 mt-2">
