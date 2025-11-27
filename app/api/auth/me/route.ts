@@ -23,12 +23,29 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const user = getUserById(session.userId);
+    // Try to get user from database
+    let user = getUserById(session.userId);
     
+    // If user not found in database (serverless/in-memory reset), use session data
+    // This handles the case where file storage doesn't persist on Vercel
     if (!user) {
+      console.warn('⚠️ User not found in database, using session data:', session.userId);
+      // Return user data from session (minimal but functional)
       return NextResponse.json({
-        isAuthenticated: false,
-        user: null,
+        isAuthenticated: true,
+        user: {
+          id: session.userId,
+          spotifyId: session.spotifyId,
+          email: session.email,
+          displayName: session.displayName,
+          imageUrl: session.imageUrl,
+          createdAt: Date.now(), // Approximate
+          preferences: {
+            theme: 'dark',
+            defaultView: 'grid',
+            autoPlay: false,
+          },
+        },
       });
     }
 

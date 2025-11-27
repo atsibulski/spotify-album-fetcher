@@ -148,10 +148,13 @@ export async function GET(request: NextRequest) {
       status: 302,
     });
     
-    // Set cookie - ensure it's set properly
+    // Set cookie - detect HTTPS for secure flag
+    const isHttps = request.nextUrl.origin.startsWith('https://') || process.env.VERCEL_URL?.includes('vercel.app');
+    const secure = isHttps || process.env.NODE_ENV === 'production';
+    
     const cookieOptions = {
       httpOnly: true,
-      secure: false, // Must be false for HTTP
+      secure: secure, // true for HTTPS (Vercel), false for local HTTP
       sameSite: 'lax' as const,
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: '/',
@@ -159,8 +162,9 @@ export async function GET(request: NextRequest) {
     
     response.cookies.set('spotify_session', sessionData, cookieOptions);
     
-    // Also manually set the Set-Cookie header to ensure it's sent
-    const cookieHeader = `spotify_session=${encodeURIComponent(sessionData)}; Path=/; Max-Age=${cookieOptions.maxAge}; SameSite=Lax; HttpOnly`;
+    // Also set via header for compatibility
+    const secureFlag = secure ? '; Secure' : '';
+    const cookieHeader = `spotify_session=${encodeURIComponent(sessionData)}; Path=/; Max-Age=${cookieOptions.maxAge}; SameSite=Lax; HttpOnly${secureFlag}`;
     response.headers.set('Set-Cookie', cookieHeader);
 
     // Verify cookie was set

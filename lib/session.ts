@@ -30,11 +30,14 @@ export function getSession(request: NextRequest): UserSession | null {
   }
 }
 
-export function setSessionCookie(response: NextResponse, sessionData: string): void {
+export function setSessionCookie(response: NextResponse, sessionData: string, requestOrigin?: string): void {
   const isProduction = process.env.NODE_ENV === 'production';
+  // Check if we're on HTTPS (Vercel uses HTTPS)
+  const isHttps = requestOrigin?.startsWith('https://') || process.env.VERCEL_URL?.includes('vercel.app');
   
-  // In development, secure must be false for HTTP
-  const secure = false; // Always false for local development
+  // Secure cookies required for HTTPS (Vercel)
+  // Only use false for local HTTP development
+  const secure = isHttps || isProduction;
   
   // Use Next.js cookies API - this should work properly
   response.cookies.set(SESSION_COOKIE_NAME, sessionData, {
@@ -49,9 +52,11 @@ export function setSessionCookie(response: NextResponse, sessionData: string): v
     name: SESSION_COOKIE_NAME,
     secure: secure,
     isProduction,
+    isHttps,
     maxAge: SESSION_MAX_AGE,
     path: '/',
     hasData: !!sessionData,
+    requestOrigin,
     cookieValue: sessionData.substring(0, 50) + '...',
   });
 }
