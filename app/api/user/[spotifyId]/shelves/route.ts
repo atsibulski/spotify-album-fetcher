@@ -36,10 +36,13 @@ export async function GET(
     }
 
     // User not in database, try to get shelves by spotifyId (for public access)
+    console.log('🔍 User not in DB, fetching shelves by spotifyId:', spotifyId);
     shelves = await getUserShelvesBySpotifyId(spotifyId);
+    console.log('📦 Shelves fetched by spotifyId:', shelves.length, 'shelves');
     
     if (shelves.length > 0) {
       // Found shelves by spotifyId, return public profile
+      console.log('✅ Returning shelves for public profile');
       return NextResponse.json({
         user: {
           id: `spotify_${spotifyId}`,
@@ -49,6 +52,8 @@ export async function GET(
         },
         shelves,
       });
+    } else {
+      console.log('⚠️ No shelves found for spotifyId:', spotifyId);
     }
 
     // User not in database (serverless environment or new user)

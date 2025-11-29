@@ -97,26 +97,43 @@ export async function getUserShelves(userId: string): Promise<Shelf[]> {
 }
 
 export async function getUserShelvesBySpotifyId(spotifyId: string): Promise<Shelf[]> {
+  console.log('🔍 Getting shelves for spotifyId:', spotifyId);
+  
   // Try Supabase first if configured
   if (isSupabaseConfigured && supabase) {
     try {
+      console.log('📦 Querying Supabase for shelves...');
       const { data, error } = await supabase
         .from('user_shelves')
         .select('shelves')
         .eq('spotify_id', spotifyId)
         .single();
       
+      console.log('📦 Supabase response:', { 
+        hasData: !!data, 
+        hasShelves: !!data?.shelves, 
+        shelvesLength: data?.shelves?.length || 0,
+        error: error?.message 
+      });
+      
       if (!error && data?.shelves) {
-        return data.shelves as Shelf[];
+        const shelves = data.shelves as Shelf[];
+        console.log('✅ Found shelves in Supabase:', shelves.length, 'shelves');
+        return shelves;
+      } else if (error) {
+        console.warn('⚠️ Supabase query error:', error.message, error.code);
       }
     } catch (error) {
-      console.warn('Supabase shelves query failed, falling back to file storage:', error);
+      console.error('❌ Supabase shelves query exception:', error);
     }
+  } else {
+    console.warn('⚠️ Supabase not configured, using fallback storage');
   }
   
   // Fallback to file storage
   const allShelves = readAllShelves();
   const userShelves = allShelves.find((us) => us.spotifyId === spotifyId);
+  console.log('📁 Fallback storage result:', userShelves?.shelves?.length || 0, 'shelves');
   return userShelves?.shelves || [];
 }
 
@@ -126,10 +143,18 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
     return;
   }
 
+  console.log('💾 Saving shelves:', {
+    userId,
+    spotifyId,
+    shelvesCount: shelves.length,
+    totalAlbums: shelves.reduce((sum, s) => sum + s.albums.length, 0),
+  });
+
   // Try Supabase first if configured
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase
+      console.log('📦 Saving to Supabase...');
+      const { data, error } = await supabase
         .from('user_shelves')
         .upsert({
           user_id: userId,
@@ -141,14 +166,21 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
         });
       
       if (!error) {
-        console.log('✅ Shelves saved to Supabase for:', spotifyId);
+        console.log('✅ Shelves saved to Supabase successfully:', spotifyId, 'shelves:', shelves.length);
         return;
       } else {
-        console.warn('Supabase upsert failed, falling back to file storage:', error);
+        console.error('❌ Supabase upsert failed:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
       }
     } catch (error) {
-      console.warn('Supabase save error, falling back to file storage:', error);
+      console.error('❌ Supabase save exception:', error);
     }
+  } else {
+    console.warn('⚠️ Supabase not configured, using fallback storage');
   }
 
   // Fallback to file storage
