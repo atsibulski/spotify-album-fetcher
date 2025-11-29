@@ -29,12 +29,16 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Create user_shelves table
+-- Note: user_id is nullable to allow shelves to exist even if user not in users table
 CREATE TABLE IF NOT EXISTS user_shelves (
   user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
   spotify_id TEXT UNIQUE NOT NULL PRIMARY KEY,
   shelves JSONB NOT NULL DEFAULT '[]'::jsonb,
   updated_at BIGINT NOT NULL
 );
+
+-- Make user_id nullable (allows shelves without user record)
+ALTER TABLE user_shelves ALTER COLUMN user_id DROP NOT NULL;
 
 -- Create indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_users_spotify_id ON users(spotify_id);

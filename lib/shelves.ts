@@ -153,17 +153,33 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
   // Try Supabase first if configured
   if (isSupabaseConfigured && supabase) {
     try {
+      // First, ensure user exists in users table (required for foreign key)
+      const { data: userCheck, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      
+      if (userError && userError.code === 'PGRST116') {
+        // User doesn't exist - this is okay, we'll save shelves without user_id
+        console.warn('⚠️ User not found in users table, saving shelves without user_id reference');
+      } else if (userError) {
+        console.warn('⚠️ Error checking user:', userError.message);
+      }
+
       console.log('📦 Saving to Supabase...', {
         spotifyId,
         userId,
+        userExists: !!userCheck,
         shelvesCount: shelves.length,
         totalAlbums: shelves.reduce((sum, s) => sum + s.albums.length, 0),
       });
       
+      // Save shelves - use user_id only if user exists, otherwise just spotify_id
       const { data, error } = await supabase
         .from('user_shelves')
         .upsert({
-          user_id: userId,
+          ...(userCheck ? { user_id: userId } : {}), // Only include user_id if user exists
           spotify_id: spotifyId,
           shelves: shelves,
           updated_at: Date.now(),
