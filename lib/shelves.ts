@@ -113,27 +113,40 @@ export async function getUserShelvesBySpotifyId(spotifyId: string): Promise<Shel
         throw new Error('Supabase client not available');
       }
       
-      console.log('📦 Querying Supabase for shelves...');
+      console.log('📦 Querying Supabase for shelves...', { spotifyId });
       const { data, error } = await client
         .from('user_shelves')
         .select('shelves')
         .eq('spotify_id', spotifyId)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle not found gracefully
       
       console.log('📦 Supabase response:', { 
         hasData: !!data, 
         hasShelves: !!data?.shelves, 
-        shelvesLength: data?.shelves?.length || 0,
-        error: error?.message 
+        shelvesLength: Array.isArray(data?.shelves) ? data.shelves.length : 0,
+        shelvesType: typeof data?.shelves,
+        error: error?.message,
+        errorCode: error?.code,
       });
       
-      if (!error && data?.shelves) {
-        const shelves = data.shelves as Shelf[];
-        console.log('✅ Found shelves in Supabase:', shelves.length, 'shelves');
-        return shelves;
-      } else if (error) {
+      if (error) {
+        // PGRST116 means no rows found - this is okay, return empty array
+        if (error.code === 'PGRST116') {
+          console.log('ℹ️ No shelves found in Supabase for:', spotifyId);
+          return [];
+        }
         console.warn('⚠️ Supabase query error:', error.message, error.code);
+        return [];
       }
+      
+      if (data?.shelves) {
+        const shelves = Array.isArray(data.shelves) ? data.shelves : [];
+        console.log('✅ Found shelves in Supabase:', shelves.length, 'shelves');
+        return shelves as Shelf[];
+      }
+      
+      console.log('ℹ️ No shelves data in response');
+      return [];
     } catch (error) {
       console.error('❌ Supabase shelves query exception:', error);
     }

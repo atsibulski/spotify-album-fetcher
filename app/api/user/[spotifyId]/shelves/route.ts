@@ -16,35 +16,25 @@ export async function GET(
       );
     }
 
-    // Try to get user from database first
+    // Always try to get shelves by spotifyId first (primary key in user_shelves table)
+    // This works regardless of whether user exists in users table
+    console.log('🔍 Fetching shelves by spotifyId:', spotifyId);
+    let shelves = await getUserShelvesBySpotifyId(spotifyId);
+    console.log('📦 Shelves fetched by spotifyId:', shelves.length, 'shelves');
+    
+    // Try to get user from database for display info
     let user = await getUserBySpotifyId(spotifyId);
-    let shelves: any[] = [];
-
-    if (user) {
-      // User exists in database, get their shelves by userId
-      shelves = await getUserShelves(user.id);
-      
+    
+    if (shelves.length > 0) {
+      // Found shelves - return profile with shelves
+      console.log('✅ Returning profile with shelves');
       return NextResponse.json({
-        user: {
+        user: user ? {
           id: user.id,
           spotifyId: user.spotifyId,
           displayName: user.displayName,
           imageUrl: user.imageUrl,
-        },
-        shelves,
-      });
-    }
-
-    // User not in database, try to get shelves by spotifyId (for public access)
-    console.log('🔍 User not in DB, fetching shelves by spotifyId:', spotifyId);
-    shelves = await getUserShelvesBySpotifyId(spotifyId);
-    console.log('📦 Shelves fetched by spotifyId:', shelves.length, 'shelves');
-    
-    if (shelves.length > 0) {
-      // Found shelves by spotifyId, return public profile
-      console.log('✅ Returning shelves for public profile');
-      return NextResponse.json({
-        user: {
+        } : {
           id: `spotify_${spotifyId}`,
           spotifyId: spotifyId,
           displayName: spotifyId,
@@ -52,9 +42,10 @@ export async function GET(
         },
         shelves,
       });
-    } else {
-      console.log('⚠️ No shelves found for spotifyId:', spotifyId);
     }
+    
+    // No shelves found - return empty profile
+    console.log('⚠️ No shelves found for spotifyId:', spotifyId);
 
     // User not in database (serverless environment or new user)
     // Fetch user info from Spotify API to create a public profile
