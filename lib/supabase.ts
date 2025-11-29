@@ -23,11 +23,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create Supabase client (server-side only)
+// Use a function to create fresh client instances to avoid connection pooling issues
+export function getSupabaseClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false, // Don't persist session on server
+    },
+    db: {
+      schema: 'public',
+    },
+  });
+}
+
+// Singleton for backward compatibility (but prefer getSupabaseClient() for new code)
 export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? getSupabaseClient()
   : null;
 
-export const isSupabaseConfigured = !!supabase;
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
 if (typeof window === 'undefined') {
   console.log('✅ Supabase client initialized:', isSupabaseConfigured);

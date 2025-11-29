@@ -1,7 +1,7 @@
 import { Shelf } from '@/types/shelf';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, getSupabaseClient } from './supabase';
 
 const DB_DIR = join(process.cwd(), 'data');
 const SHELVES_FILE = join(DB_DIR, 'shelves.json');
@@ -65,17 +65,22 @@ function writeAllShelves(allShelves: UserShelves[]): void {
 
 export async function getUserShelves(userId: string): Promise<Shelf[]> {
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
       // First get user's spotifyId
-      const { data: userData } = await supabase
+      const { data: userData } = await client
         .from('users')
         .select('spotify_id')
         .eq('id', userId)
         .single();
       
       if (userData?.spotify_id) {
-        const { data, error } = await supabase
+        const { data, error } = await client
           .from('user_shelves')
           .select('shelves')
           .eq('spotify_id', userData.spotify_id)
@@ -100,10 +105,16 @@ export async function getUserShelvesBySpotifyId(spotifyId: string): Promise<Shel
   console.log('🔍 Getting shelves for spotifyId:', spotifyId);
   
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
+      // Use fresh client instance to avoid connection issues
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
       console.log('📦 Querying Supabase for shelves...');
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('user_shelves')
         .select('shelves')
         .eq('spotify_id', spotifyId)
@@ -151,10 +162,16 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
   });
 
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
+      // Use fresh client instance to avoid connection issues
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
       // First, ensure user exists in users table (required for foreign key)
-      const { data: userCheck, error: userError } = await supabase
+      const { data: userCheck, error: userError } = await client
         .from('users')
         .select('id')
         .eq('id', userId)
@@ -176,7 +193,7 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
       });
       
       // Save shelves - use user_id only if user exists, otherwise just spotify_id
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('user_shelves')
         .upsert({
           ...(userCheck ? { user_id: userId } : {}), // Only include user_id if user exists
