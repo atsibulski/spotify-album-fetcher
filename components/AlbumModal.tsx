@@ -222,63 +222,27 @@ export default function AlbumModal({ album, isOpen, onClose, formatDuration }: A
 
               <div className="p-8">
           <div className="grid md:grid-cols-2 gap-8 mb-8">
-            {/* Album Cover with Flip Effect */}
+            {/* Album Cover */}
             <div className="flex justify-center">
               <motion.div
                 className="relative w-full max-w-md aspect-square"
-                style={{ perspective: '1000px' }}
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               >
-                <motion.div
-                  className="relative w-full h-full"
-                  style={{ transformStyle: 'preserve-3d' }}
-                  whileHover={{ rotateY: 180 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 200,
-                    damping: 20,
-                    duration: 0.6,
-                  }}
-                >
-                  {/* Front of card */}
-                  <motion.div
-                    className="absolute inset-0"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                    }}
-                  >
-                    {coverImage ? (
-                      <div className="relative w-full h-full rounded-lg overflow-hidden shadow-xl">
-                        <Image
-                          src={coverImage}
-                          alt={`${album.name} cover`}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-full bg-gray-800 rounded-lg flex items-center justify-center">
-                        <span className="text-gray-500">No image available</span>
-                      </div>
-                    )}
-                  </motion.div>
-                  {/* Back of card */}
-                  <motion.div
-                    className="absolute inset-0 bg-gray-800 rounded-lg flex items-center justify-center p-4"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                      rotateY: 180,
-                    }}
-                  >
-                    <div className="text-center text-white">
-                      <p className="text-lg font-semibold mb-2">{album.name}</p>
-                      <p className="text-gray-400">{album.artists}</p>
-                    </div>
-                  </motion.div>
-                </motion.div>
+                {coverImage ? (
+                  <div className="relative w-full h-full rounded-lg overflow-hidden shadow-xl">
+                    <Image
+                      src={coverImage}
+                      alt={`${album.name} cover`}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-full bg-gray-800 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-500">No image available</span>
+                  </div>
+                )}
               </motion.div>
             </div>
 
