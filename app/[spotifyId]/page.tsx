@@ -139,12 +139,19 @@ export default function UserProfilePage() {
   const isOwnProfile = !authLoading && isAuthenticated && currentUser?.spotifyId === spotifyId;
 
   // Get unified shelf for display - MUST be called before any early returns (Rules of Hooks)
-  // If viewing own profile, use the hook shelves for real-time updates
-  // Compute directly from hookShelves to avoid calling getUnifiedShelf() which might trigger side effects
+  // Priority: Use server-fetched shelves if available (for public access), otherwise use hook shelves for own profile
   const displayShelf = useMemo(() => {
+    const UNIFIED_SHELF_NAME = 'My Albums';
+    
+    // Always prefer server-fetched shelves if they exist (for public access)
+    // This ensures albums are visible to everyone, not just the owner
+    const serverShelf = shelves.find(s => s.name === UNIFIED_SHELF_NAME);
+    if (serverShelf && serverShelf.albums.length > 0) {
+      return serverShelf;
+    }
+    
+    // If viewing own profile and no server data, use hook shelves (localStorage)
     if (isOwnProfile) {
-      // Use hook shelves for real-time updates - compute directly from hookShelves
-      const UNIFIED_SHELF_NAME = 'My Albums';
       const unifiedShelf = hookShelves.find((s) => s.name === UNIFIED_SHELF_NAME);
       return unifiedShelf || {
         id: 'unified',
@@ -152,15 +159,15 @@ export default function UserProfilePage() {
         albums: [],
         createdAt: Date.now(),
       };
-    } else {
-      // Use fetched shelves for other users
-      return shelves.find(s => s.name === 'My Albums') || {
-        id: 'unified',
-        name: 'My Albums',
-        albums: [],
-        createdAt: Date.now(),
-      };
     }
+    
+    // For public viewers, return empty shelf if no server data
+    return {
+      id: 'unified',
+      name: UNIFIED_SHELF_NAME,
+      albums: [],
+      createdAt: Date.now(),
+    };
   }, [isOwnProfile, hookShelves, shelves]);
 
   if (loading) {
