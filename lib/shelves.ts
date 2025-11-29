@@ -153,7 +153,13 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
   // Try Supabase first if configured
   if (isSupabaseConfigured && supabase) {
     try {
-      console.log('📦 Saving to Supabase...');
+      console.log('📦 Saving to Supabase...', {
+        spotifyId,
+        userId,
+        shelvesCount: shelves.length,
+        totalAlbums: shelves.reduce((sum, s) => sum + s.albums.length, 0),
+      });
+      
       const { data, error } = await supabase
         .from('user_shelves')
         .upsert({
@@ -166,7 +172,7 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
         });
       
       if (!error) {
-        console.log('✅ Shelves saved to Supabase successfully:', spotifyId, 'shelves:', shelves.length);
+        console.log('✅ Shelves saved to Supabase successfully:', spotifyId);
         return;
       } else {
         console.error('❌ Supabase upsert failed:', {
@@ -175,12 +181,21 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
           details: error.details,
           hint: error.hint,
         });
+        // Don't fall through - let the error be logged but still try fallback
       }
-    } catch (error) {
-      console.error('❌ Supabase save exception:', error);
+    } catch (error: any) {
+      console.error('❌ Supabase save exception:', {
+        message: error?.message,
+        stack: error?.stack,
+      });
     }
   } else {
-    console.warn('⚠️ Supabase not configured, using fallback storage');
+    console.warn('⚠️ Supabase not configured, using fallback storage', {
+      isSupabaseConfigured,
+      hasSupabase: !!supabase,
+      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    });
   }
 
   // Fallback to file storage
