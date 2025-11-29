@@ -1,7 +1,7 @@
 import { User } from '@/types/user';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, getSupabaseClient } from './supabase';
 
 const DB_DIR = join(process.cwd(), 'data');
 const USERS_FILE = join(DB_DIR, 'users.json');
@@ -58,9 +58,14 @@ function writeUsers(users: User[]): void {
 
 export async function getUserBySpotifyId(spotifyId: string): Promise<User | null> {
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
-      const { data, error } = await supabase
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
+      const { data, error } = await client
         .from('users')
         .select('*')
         .eq('spotify_id', spotifyId)
@@ -94,9 +99,14 @@ export async function getUserBySpotifyId(spotifyId: string): Promise<User | null
 
 export async function getUserById(userId: string): Promise<User | null> {
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
-      const { data, error } = await supabase
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
+      const { data, error } = await client
         .from('users')
         .select('*')
         .eq('id', userId)
@@ -136,9 +146,15 @@ export async function createUser(userData: Omit<User, 'id' | 'createdAt' | 'upda
   };
 
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
-      const { error } = await supabase
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
+      console.log('📦 Creating user in Supabase:', newUser.spotifyId);
+      const { data, error } = await client
         .from('users')
         .insert({
           id: newUser.id,
@@ -152,16 +168,26 @@ export async function createUser(userData: Omit<User, 'id' | 'createdAt' | 'upda
           preferences: newUser.preferences,
           created_at: newUser.createdAt,
           updated_at: newUser.updatedAt,
-        });
+        })
+        .select()
+        .single();
       
       if (!error) {
-        console.log('✅ User created in Supabase:', newUser.spotifyId);
+        console.log('✅ User created in Supabase:', newUser.spotifyId, 'id:', newUser.id);
         return newUser;
       } else {
-        console.warn('Supabase insert failed, falling back to file storage:', error);
+        console.error('❌ Supabase user insert failed:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
       }
-    } catch (error) {
-      console.warn('Supabase insert error, falling back to file storage:', error);
+    } catch (error: any) {
+      console.error('❌ Supabase user insert exception:', {
+        message: error?.message,
+        stack: error?.stack,
+      });
     }
   }
 
@@ -174,8 +200,13 @@ export async function createUser(userData: Omit<User, 'id' | 'createdAt' | 'upda
 
 export async function updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
   // Try Supabase first if configured
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
+      const client = getSupabaseClient();
+      if (!client) {
+        throw new Error('Supabase client not available');
+      }
+      
       const updateData: any = {
         updated_at: Date.now(),
       };
@@ -188,7 +219,7 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
       if (updates.tokenExpiresAt !== undefined) updateData.token_expires_at = updates.tokenExpiresAt;
       if (updates.preferences !== undefined) updateData.preferences = updates.preferences;
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('users')
         .update(updateData)
         .eq('id', userId)

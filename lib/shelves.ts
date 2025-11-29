@@ -205,8 +205,8 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
         });
       
       if (!error) {
-        console.log('✅ Shelves saved to Supabase successfully:', spotifyId);
-        return;
+        console.log('✅ Shelves saved to Supabase successfully:', spotifyId, 'shelves:', shelves.length);
+        return; // Success - exit early
       } else {
         console.error('❌ Supabase upsert failed:', {
           message: error.message,
@@ -214,7 +214,7 @@ export async function saveUserShelves(userId: string, shelves: Shelf[], spotifyI
           details: error.details,
           hint: error.hint,
         });
-        // Don't fall through - let the error be logged but still try fallback
+        // Continue to fallback
       }
     } catch (error: any) {
       console.error('❌ Supabase save exception:', {
