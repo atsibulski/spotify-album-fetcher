@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUserAuth } from '@/hooks/useUserAuth';
 import { useShelves } from '@/hooks/useShelves';
@@ -39,41 +39,41 @@ export default function UserProfilePage() {
     });
   }, [authLoading, isAuthenticated, currentUser?.spotifyId, spotifyId]);
 
-  useEffect(() => {
+  const fetchUserProfile = useCallback(async () => {
     if (!spotifyId) return;
 
-    const fetchUserProfile = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/user/${spotifyId}/shelves`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('User not found');
-          } else {
-            setError('Failed to load profile');
-          }
-          return;
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/user/${spotifyId}/shelves`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError('User not found');
+        } else {
+          setError('Failed to load profile');
         }
-
-        const data = await response.json();
-        // Always set profile user (API now returns a profile even if user not in DB)
-        setProfileUser(data.user || {
-          spotifyId: spotifyId,
-          displayName: spotifyId,
-          imageUrl: null,
-        });
-        setShelves(data.shelves || []);
-      } catch (err) {
-        console.error('Error fetching user profile:', err);
-        setError('Failed to load profile');
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
-    fetchUserProfile();
+      const data = await response.json();
+      // Always set profile user (API now returns a profile even if user not in DB)
+      setProfileUser(data.user || {
+        spotifyId: spotifyId,
+        displayName: spotifyId,
+        imageUrl: null,
+      });
+      setShelves(data.shelves || []);
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
   }, [spotifyId]);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const handleAlbumSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +119,12 @@ export default function UserProfilePage() {
 
       addAlbumToUnifiedShelf(album);
       setAlbumUrl('');
+      
+      // Refetch server shelves after adding album to update the display
+      // Wait a bit for the server save to complete
+      setTimeout(() => {
+        fetchUserProfile();
+      }, 500);
     } catch (err) {
       setAlbumError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -139,29 +145,27 @@ export default function UserProfilePage() {
   const isOwnProfile = !authLoading && isAuthenticated && currentUser?.spotifyId === spotifyId;
 
   // Get unified shelf for display - MUST be called before any early returns (Rules of Hooks)
-  // Priority: Use server-fetched shelves if available (for public access), otherwise use hook shelves for own profile
+  // Priority: When viewing own profile, use hook shelves for immediate updates
+  // For public viewers, use server-fetched shelves
   const displayShelf = useMemo(() => {
     const UNIFIED_SHELF_NAME = 'My Albums';
     
-    // Always prefer server-fetched shelves if they exist (for public access)
-    // This ensures albums are visible to everyone, not just the owner
+    // If viewing own profile, prioritize hook shelves for immediate updates
+    // This ensures albums appear instantly when added
+    if (isOwnProfile) {
+      const unifiedShelf = hookShelves.find((s) => s.name === UNIFIED_SHELF_NAME);
+      if (unifiedShelf && unifiedShelf.albums.length > 0) {
+        return unifiedShelf;
+      }
+    }
+    
+    // For public viewers or if no hook shelves, use server-fetched shelves
     const serverShelf = shelves.find(s => s.name === UNIFIED_SHELF_NAME);
     if (serverShelf && serverShelf.albums.length > 0) {
       return serverShelf;
     }
     
-    // If viewing own profile and no server data, use hook shelves (localStorage)
-    if (isOwnProfile) {
-      const unifiedShelf = hookShelves.find((s) => s.name === UNIFIED_SHELF_NAME);
-      return unifiedShelf || {
-        id: 'unified',
-        name: UNIFIED_SHELF_NAME,
-        albums: [],
-        createdAt: Date.now(),
-      };
-    }
-    
-    // For public viewers, return empty shelf if no server data
+    // Fallback: empty shelf
     return {
       id: 'unified',
       name: UNIFIED_SHELF_NAME,
